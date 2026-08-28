@@ -13,7 +13,7 @@
     "build:server": "npm run build:shared && npm run build --workspace=@coup/server",
     "build:client": "npm run build:shared && npm run build --workspace=@coup/client",
     "dev:server": "npm run build:shared && npm run dev --workspace=@coup/server",
-    "dev:client": "npm run dev --workspace=@coup/client",
+    "dev:client": "npm run build:shared && npm run dev --workspace=@coup/client",
     "start": "npm run start --workspace=@coup/server",
     "test": "npm run build:shared && npm run test --workspace=@coup/server && npm run test --workspace=@coup/client",
     "typecheck": "tsc -b && tsc -p server --noEmit && tsc -p client --noEmit"
