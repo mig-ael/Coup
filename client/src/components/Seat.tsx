@@ -1,4 +1,5 @@
-import type { PublicPlayerView } from "@coup/shared";
+import type { Card, PublicPlayerView } from "@coup/shared";
+import { CardFace } from "./CardFace.js";
 
 interface Props {
   player: PublicPlayerView;
@@ -7,9 +8,10 @@ interface Props {
   isHost: boolean;
   canForfeit: boolean;
   onForfeit: () => void;
+  onInspect: (card: Card) => void;
 }
 
-export function Seat({ player, isYou, isTurn, isHost, canForfeit, onForfeit }: Props) {
+export function Seat({ player, isYou, isTurn, isHost, canForfeit, onForfeit, onInspect }: Props) {
   const classes = ["seat", isTurn ? "active" : "", player.eliminated ? "out" : ""].join(" ").trim();
 
   return (
@@ -33,9 +35,7 @@ export function Seat({ player, isYou, isTurn, isHost, canForfeit, onForfeit }: P
       {player.revealed.length > 0 && (
         <div className="revealed">
           {player.revealed.map((card, i) => (
-            <span key={i} className="card-tag dead">
-              {card}
-            </span>
+            <CardFace key={i} card={card} size="small" spent onClick={() => onInspect(card)} />
           ))}
         </div>
       )}

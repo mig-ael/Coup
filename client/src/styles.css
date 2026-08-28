@@ -19,6 +19,17 @@
   --danger: #c48080;
   --danger-dim: #3d2c2f;
 
+  --duke: #8f7bb5;
+  --duke-bg: #2b2436;
+  --assassin: #9aa0ab;
+  --assassin-bg: #23252a;
+  --captain: #6f9ac9;
+  --captain-bg: #212d3a;
+  --ambassador: #7faa80;
+  --ambassador-bg: #222e24;
+  --contessa: #c07f83;
+  --contessa-bg: #332426;
+
   --radius: 10px;
   --radius-sm: 7px;
 
@@ -35,6 +46,9 @@ body {
   color: var(--text);
   font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  /* Long names and codes must never push the page sideways. */
+  overflow-wrap: break-word;
 }
 
 button {
@@ -45,6 +59,9 @@ button {
   border-radius: var(--radius);
   padding: 9px 16px;
   cursor: pointer;
+  /* Comfortable to hit with a thumb. */
+  min-height: 44px;
+  touch-action: manipulation;
 }
 
 button:hover:not(:disabled) {
@@ -67,13 +84,20 @@ button.danger:hover:not(:disabled) {
 }
 
 input {
-  font: inherit;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  padding: 10px 13px;
+  padding: 11px 13px;
   width: 100%;
+  min-width: 0;
+  font-family: inherit;
+  /*
+   * Must not drop below 16px: iOS Safari zooms the whole page in when you focus an
+   * input with a smaller font, and there is no way back out without pinching.
+   */
+  font-size: 16px;
+  min-height: 44px;
 }
 
 input:focus {
@@ -85,6 +109,8 @@ input:focus {
 
 .centered {
   min-height: 100vh;
+  /* Dynamic units account for mobile browser chrome sliding in and out. */
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -171,9 +197,10 @@ input:focus {
 .topbar {
   grid-column: 1 / -1;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: baseline;
-  gap: 16px;
+  gap: 8px 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border);
 }
@@ -318,11 +345,17 @@ input:focus {
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 18px;
+  text-align: center;
+}
+
+.prompt .row,
+.prompt .hand {
+  justify-content: center;
 }
 
 .prompt-title {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   font-size: 15px;
 }
 
@@ -364,8 +397,205 @@ input:focus {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /*
+   * On a narrow screen the log cannot sit top right, so it moves below the board.
+   * What you must do next is promoted above the seats instead, so the prompt and its
+   * buttons are reachable without scrolling.
+   */
+  .game main > .prompt {
+    order: -1;
+  }
+
   .log {
     position: static;
-    max-height: 260px;
+    max-height: 240px;
+  }
+}
+
+@media (max-width: 460px) {
+  .game {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .panel {
+    padding: 18px;
+  }
+
+  .centered {
+    padding: 14px;
+  }
+
+  /* One seat per row rather than a cramped two. */
+  .seats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Full-width action buttons are easier to hit and read than a ragged wrap. */
+  .prompt .row button,
+  .hand button {
+    flex: 1 1 100%;
+  }
+}
+
+/* ---------------------------------------------------------------- cards */
+
+/*
+ * Character cards carry the physical deck's colours — Duke purple, Assassin black,
+ * Captain blue, Ambassador green, Contessa red — desaturated so a hand of them reads
+ * clearly on a dark ground without becoming the loudest thing on screen.
+ */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  text-align: left;
+  width: 190px;
+  min-height: 168px;
+  padding: 15px 16px;
+  border: 1px solid var(--tint);
+  border-left: 4px solid var(--tint);
+  border-radius: var(--radius);
+  background: var(--tint-bg);
+  color: var(--text);
+}
+
+.card:hover:not(:disabled) {
+  border-color: var(--tint);
+  filter: brightness(1.12);
+}
+
+.card-name {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--tint);
+}
+
+.card-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.card-rule {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+.card-rule-block::before {
+  content: "↩ ";
+  color: var(--tint);
+}
+
+.card-cta {
+  margin-top: auto;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--tint);
+}
+
+.card-small {
+  width: auto;
+  min-height: 0;
+  padding: 7px 12px;
+  gap: 0;
+}
+
+.card-small .card-name {
+  font-size: 14px;
+}
+
+.card-spent {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.card-selected {
+  outline: 2px solid var(--tint);
+  outline-offset: 2px;
+  filter: brightness(1.18);
+}
+
+.card-duke { --tint: var(--duke); --tint-bg: var(--duke-bg); }
+.card-assassin { --tint: var(--assassin); --tint-bg: var(--assassin-bg); }
+.card-captain { --tint: var(--captain); --tint-bg: var(--captain-bg); }
+.card-ambassador { --tint: var(--ambassador); --tint-bg: var(--ambassador-bg); }
+.card-contessa { --tint: var(--contessa); --tint-bg: var(--contessa-bg); }
+
+.your-hand {
+  text-align: center;
+}
+
+.your-hand .hand {
+  justify-content: center;
+}
+
+/* ---------------------------------------------------------------- modal */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 11, 14, 0.72);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  z-index: 10;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 20px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 86vh;
+  max-height: 86dvh;
+  overflow-y: auto;
+}
+
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.card-reference {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ref-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 13px 15px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--tint);
+  border-radius: var(--radius-sm);
+  background: var(--tint-bg);
+}
+
+.ref-row-focus {
+  border-color: var(--tint);
+}
+
+@media (max-width: 460px) {
+  .card {
+    width: 100%;
+    min-height: 0;
   }
 }

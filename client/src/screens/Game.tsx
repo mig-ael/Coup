@@ -1,5 +1,8 @@
+import { useState } from "react";
 import type { ActionType, Card } from "@coup/shared";
 import { ActionLog } from "../components/ActionLog.js";
+import { CardFace } from "../components/CardFace.js";
+import { CardInfoModal } from "../components/CardInfoModal.js";
 import { PromptPanel } from "../components/PromptPanel.js";
 import { Seat } from "../components/Seat.js";
 import { derivePrompt } from "../game/prompt.js";
@@ -23,6 +26,14 @@ interface Props {
 
 export function Game(props: Props) {
   const { view, hand, error } = props;
+  // The character reference is reachable at any point, either from the header or by
+  // tapping any card on the table.
+  const [inspecting, setInspecting] = useState<Card | null>(null);
+  const [referenceOpen, setReferenceOpen] = useState(false);
+  const openReference = (card: Card | null) => {
+    setInspecting(card);
+    setReferenceOpen(true);
+  };
   const nameOf = (id: string | null) =>
     view.players.find((p) => p.id === id)?.name ?? "another player";
 
@@ -37,8 +48,11 @@ export function Game(props: Props) {
         <div>
           <strong>Coup</strong> <span className="code-chip">{view.code}</span>
         </div>
-        <div className="muted">
-          {over ? `${nameOf(view.winnerId)} wins` : `${nameOf(turnId)}'s turn`}
+        <div className="row" style={{ alignItems: "center" }}>
+          <span className="muted">
+            {over ? `${nameOf(view.winnerId)} wins` : `${nameOf(turnId)}'s turn`}
+          </span>
+          <button onClick={() => openReference(null)}>Characters</button>
         </div>
       </header>
 
@@ -54,6 +68,7 @@ export function Game(props: Props) {
               // Only the host, only mid-game, and only for someone actually away.
               canForfeit={isHost && !over && !player.connected && !player.eliminated}
               onForfeit={() => props.onForfeit(player.id)}
+              onInspect={openReference}
             />
           ))}
         </section>
@@ -93,19 +108,17 @@ export function Game(props: Props) {
         )}
 
         {prompt.kind !== "lose_influence" && prompt.kind !== "exchange" && (
-          <section>
+          <section className="your-hand">
             <p className="section-label">Your influence</p>
-            <div className="revealed">
-              {hand.length === 0 ? (
-                <span className="faint">You have no influence left.</span>
-              ) : (
-                hand.map((card, i) => (
-                  <span key={i} className="card-tag">
-                    {card}
-                  </span>
-                ))
-              )}
-            </div>
+            {hand.length === 0 ? (
+              <p className="faint">You have no influence left.</p>
+            ) : (
+              <div className="hand">
+                {hand.map((card, i) => (
+                  <CardFace key={i} card={card} actionLabel="What it does" onClick={() => openReference(card)} />
+                ))}
+              </div>
+            )}
           </section>
         )}
 
@@ -113,6 +126,10 @@ export function Game(props: Props) {
       </main>
 
       <ActionLog log={view.log} nameOf={nameOf} />
+
+      {referenceOpen && (
+        <CardInfoModal focus={inspecting} onClose={() => setReferenceOpen(false)} />
+      )}
     </div>
   );
 }

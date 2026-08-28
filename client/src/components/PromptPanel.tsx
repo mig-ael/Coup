@@ -3,6 +3,7 @@ import { ACTION_RULES, type ActionType, type Card } from "@coup/shared";
 import type { Prompt } from "../game/prompt.js";
 import { label } from "../game/prompt.js";
 import type { Snapshot } from "../net/session.js";
+import { CardFace } from "./CardFace.js";
 import { Countdown } from "./Countdown.js";
 
 interface Props {
@@ -60,9 +61,7 @@ export function PromptPanel(props: Props) {
           <p className="prompt-title">Choose an influence to lose. It stays face up.</p>
           <div className="hand">
             {hand.map((card, i) => (
-              <button key={i} className="danger" onClick={() => props.onLose(i)}>
-                Reveal {card}
-              </button>
+              <CardFace key={i} card={card} actionLabel="Reveal" onClick={() => props.onLose(i)} />
             ))}
           </div>
         </div>
@@ -148,13 +147,13 @@ function Exchange({
       </p>
       <div className="hand">
         {hand.map((card, i) => (
-          <button
+          <CardFace
             key={i}
-            className={picked.includes(i) ? "primary" : ""}
+            card={card}
+            selected={picked.includes(i)}
+            actionLabel={picked.includes(i) ? "Keeping" : "Keep"}
             onClick={() => toggle(i)}
-          >
-            {card}
-          </button>
+          />
         ))}
       </div>
       <div className="row" style={{ marginTop: 12 }}>

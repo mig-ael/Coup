@@ -139,3 +139,78 @@ describe("the app against a live backend", () => {
     await waitFor(() => expect(onTurn.ui.getByText("5 coins")).toBeTruthy(), { timeout: 5000 });
   });
 });
+
+describe("the character cards", () => {
+  const startedGame = async () => {
+    const { app: host, code } = await hostGame("Alice");
+    const guest = await joinGame(code, "Bob");
+    await waitFor(() => expect(host.ui.getByText("Bob")).toBeTruthy(), { timeout: 5000 });
+    await host.user.click(host.ui.getByRole("button", { name: "Start game" }));
+    await waitFor(() => expect(host.ui.getByText("Your influence")).toBeTruthy(), { timeout: 5000 });
+    return { host, guest };
+  };
+
+  test("your own influence is shown as named character cards", async () => {
+    const { host } = await startedGame();
+
+    const cards = host.ui.getAllByRole("button", { name: /What it does/ });
+
+    expect(cards).toHaveLength(2);
+    for (const card of cards) {
+      expect(card.textContent).toMatch(/Duke|Assassin|Captain|Ambassador|Contessa/);
+    }
+  });
+
+  test("each card is tinted by its character", async () => {
+    const { host } = await startedGame();
+
+    const cards = host.ui.getAllByRole("button", { name: /What it does/ });
+
+    for (const card of cards) {
+      expect(card.className).toMatch(/card-(duke|assassin|captain|ambassador|contessa)/);
+    }
+  });
+
+  test("tapping one of your cards opens the character reference", async () => {
+    const { host } = await startedGame();
+
+    await host.user.click(host.ui.getAllByRole("button", { name: /What it does/ })[0]!);
+
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
+    expect(within(dialog).getByRole("heading", { name: "Characters" })).toBeTruthy();
+  });
+
+  test("the reference lists every character with its action and counteraction", async () => {
+    const { host } = await startedGame();
+
+    await host.user.click(host.ui.getByRole("button", { name: "Characters" }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
+
+    for (const name of ["Duke", "Assassin", "Captain", "Ambassador", "Contessa"]) {
+      expect(within(dialog).getByText(name)).toBeTruthy();
+    }
+    // Derived from the rules table, not restated in the UI.
+    expect(within(dialog).getByText(/Blocks Foreign Aid/)).toBeTruthy();
+    expect(within(dialog).getByText(/Blocks Assassinate aimed at you/)).toBeTruthy();
+    expect(within(dialog).getByText(/Take 3 coins/)).toBeTruthy();
+  });
+
+  test("the reference is reachable from the lobby too", async () => {
+    const { app } = await hostGame("Alice");
+
+    await app.user.click(app.ui.getByRole("button", { name: "Characters" }));
+
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
+    expect(within(dialog).getByText("Contessa")).toBeTruthy();
+  });
+
+  test("the reference closes again", async () => {
+    const { app } = await hostGame("Alice");
+    await app.user.click(app.ui.getByRole("button", { name: "Characters" }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
+
+    await app.user.click(within(dialog).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull(), { timeout: 3000 });
+  });
+});
