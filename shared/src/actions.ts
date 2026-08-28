@@ -41,5 +41,13 @@ export const EXCHANGE_DRAW = 2;
 
 export const STARTING_COINS = 2;
 export const STARTING_INFLUENCE = 2;
+/**
+ * Block/challenge window lengths the host may pick in the lobby. `null` means no
+ * timer: a window stays open until every eligible player has explicitly passed.
+ */
+export const TIMER_OPTIONS = [null, 15, 30, 60] as const;
+
+export type TimerSetting = (typeof TIMER_OPTIONS)[number];
+
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 6;

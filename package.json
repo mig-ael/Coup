@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "test": "npm run test --workspace=server",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b && tsc -p server --noEmit"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

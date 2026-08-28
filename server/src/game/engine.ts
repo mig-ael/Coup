@@ -5,8 +5,10 @@ import {
   STARTING_COINS,
   STARTING_INFLUENCE,
   EXCHANGE_DRAW,
+  TIMER_OPTIONS,
   type ActionType,
   type Card,
+  type TimerSetting,
 } from "@coup/shared";
 import { createDeck, createRng, shuffle } from "./deck.js";
 import { currentPlayerId, getPlayer, legalActions, livingPlayers } from "./rules.js";
@@ -14,6 +16,7 @@ import type {
   ApplyResult,
   Command,
   GameState,
+  LossReason,
   PendingAction,
   Phase,
   PlayerState,
@@ -21,6 +24,7 @@ import type {
 
 export function createGame(): GameState {
   return {
+    config: { timerSeconds: null },
     phase: "lobby",
     hostId: null,
     players: [],
@@ -32,6 +36,7 @@ export function createGame(): GameState {
     exchange: null,
     resume: null,
     winnerId: null,
+    log: [],
     rngSeed: 0,
   };
 }
@@ -67,6 +72,14 @@ export function apply(state: GameState, cmd: Command): ApplyResult {
       return timeout(next);
     case "EXCHANGE_KEEP":
       return exchangeKeep(next, cmd.playerId, cmd.keepIndices);
+    case "SET_CONNECTED":
+      return setConnected(next, cmd.playerId, cmd.connected);
+    case "SET_CONFIG":
+      return setConfig(next, cmd.playerId, cmd.timerSeconds);
+    case "FORFEIT":
+      return forfeit(next, cmd.playerId, cmd.byId);
+    case "RESTART":
+      return restart(next, cmd.playerId);
   }
 }
 
@@ -92,12 +105,56 @@ function addPlayer(state: GameState, playerId: string, name: string): ApplyResul
 }
 
 function removePlayer(state: GameState, playerId: string): ApplyResult {
+  // Mid-game a departure is a disconnect, not a removal: the seat and its cards are
+  // held so the player can rejoin, and turn order stays intact.
+  if (state.phase !== "lobby") return fail("wrong_phase");
   if (!getPlayer(state, playerId)) return fail("unknown_player");
 
   state.players = state.players.filter((p) => p.id !== playerId);
   if (state.hostId === playerId) {
     state.hostId = state.players[0]?.id ?? null;
   }
+
+  return { ok: true, state };
+}
+
+function setConfig(
+  state: GameState,
+  playerId: string,
+  timerSeconds: TimerSetting,
+): ApplyResult {
+  if (state.phase !== "lobby") return fail("wrong_phase");
+  if (!getPlayer(state, playerId)) return fail("unknown_player");
+  if (state.hostId !== playerId) return fail("not_host");
+  if (!TIMER_OPTIONS.includes(timerSeconds)) return fail("invalid_timer");
+
+  state.config.timerSeconds = timerSeconds;
+
+  return { ok: true, state };
+}
+
+function restart(state: GameState, playerId: string): ApplyResult {
+  if (state.phase !== "game_over") return fail("wrong_phase");
+  if (!getPlayer(state, playerId)) return fail("unknown_player");
+  if (state.hostId !== playerId) return fail("not_host");
+
+  for (const player of state.players) {
+    player.coins = 0;
+    player.hand = [];
+    player.revealed = [];
+    player.eliminated = false;
+  }
+
+  state.phase = "lobby";
+  state.turnOrder = [];
+  state.currentTurnIndex = 0;
+  state.deck = [];
+  state.pendingLosses = [];
+  state.pending = null;
+  state.exchange = null;
+  state.resume = null;
+  state.winnerId = null;
+  state.log = [];
 
   return { ok: true, state };
 }
@@ -124,6 +181,7 @@ function startGame(state: GameState, playerId: string, seed: number): ApplyResul
   state.currentTurnIndex = 0;
   state.rngSeed = rng.seed;
   state.phase = "awaiting_action";
+  state.log.push({ type: "game_started", turnOrder: [...state.turnOrder] });
 
   return { ok: true, state };
 }
@@ -153,6 +211,8 @@ function declareAction(
   const actor = getPlayer(state, playerId)!;
   actor.coins -= rule.cost;
 
+  state.log.push({ type: "action", actorId: playerId, action, targetId: targetId ?? null });
+
   state.pending = {
     actorId: playerId,
     action,
@@ -170,6 +230,84 @@ function declareAction(
   }
 
   return { ok: true, state };
+}
+
+// ------------------------------------------------- connection & forfeit
+
+function setConnected(state: GameState, playerId: string, connected: boolean): ApplyResult {
+  const player = getPlayer(state, playerId);
+  if (!player) return fail("unknown_player");
+
+  player.connected = connected;
+
+  // A player who is gone cannot answer an open window, and with no timer configured
+  // nothing else would ever close it.
+  if (!connected && state.pending && inWindow(state)) {
+    state.pending.awaiting = state.pending.awaiting.filter((id) => id !== playerId);
+    if (state.pending.awaiting.length === 0) closeWindow(state);
+  }
+
+  return { ok: true, state };
+}
+
+/**
+ * Removes a disconnected player from the game, surrendering both influence. Only the
+ * host may do this, and only to someone actually disconnected — the grace period
+ * before the option appears is the room's business, not the rules engine's.
+ */
+function forfeit(state: GameState, playerId: string, byId: string): ApplyResult {
+  if (state.phase === "lobby" || state.phase === "game_over") return fail("wrong_phase");
+
+  const player = getPlayer(state, playerId);
+  if (!player) return fail("unknown_player");
+  if (state.hostId !== byId) return fail("not_host");
+  if (player.connected) return fail("player_connected");
+  if (player.eliminated) return fail("already_eliminated");
+
+  state.log.push({ type: "forfeited", playerId });
+  while (player.hand.length > 0) reveal(state, player, 0, "forfeit");
+
+  state.pendingLosses = state.pendingLosses.filter((l) => l.playerId !== playerId);
+  if (state.pending) {
+    state.pending.awaiting = state.pending.awaiting.filter((id) => id !== playerId);
+  }
+
+  resumeAfterForfeit(state, playerId);
+
+  return { ok: true, state };
+}
+
+/** Picks the game back up from whatever the forfeited player was holding up. */
+function resumeAfterForfeit(state: GameState, playerId: string): void {
+  if (checkGameOver(state)) return;
+
+  if (state.phase === "awaiting_influence_loss") {
+    settle(state);
+    return;
+  }
+
+  if (state.pending) {
+    if (state.pending.actorId === playerId) {
+      state.pending = null;
+      endTurn(state);
+    } else if (state.pending.block?.playerId === playerId) {
+      state.pending.block = null;
+      resolveAction(state);
+    } else if (inWindow(state) && state.pending.awaiting.length === 0) {
+      closeWindow(state);
+    }
+    return;
+  }
+
+  if (state.phase === "awaiting_exchange" && state.exchange?.playerId === playerId) {
+    state.exchange = null;
+    endTurn(state);
+    return;
+  }
+
+  if (state.phase === "awaiting_action" && currentPlayerId(state) === playerId) {
+    endTurn(state);
+  }
 }
 
 // ------------------------------------------------- response windows
@@ -223,6 +361,7 @@ function closeWindow(state: GameState): void {
       return;
     case "awaiting_block_challenge":
       // The block went unchallenged, so it stands and the action does not happen.
+      logActionFailed(state, state.pending!, "block");
       state.pending = null;
       settle(state);
       return;
@@ -262,6 +401,7 @@ function block(state: GameState, playerId: string, claim: Card): ApplyResult {
   if (!ACTION_RULES[state.pending.action].blockedBy.includes(claim)) return fail("invalid_block");
 
   state.pending.block = { playerId, claim };
+  state.log.push({ type: "block", blockerId: playerId, claim });
   openWindow(state, "awaiting_block_challenge", respondersExcept(state, playerId));
 
   return { ok: true, state };
@@ -287,13 +427,23 @@ function challenge(state: GameState, challengerId: string): ApplyResult {
   const claimant = getPlayer(state, claimantId)!;
   const held = claimant.hand.indexOf(claim);
 
+  state.log.push({
+    type: "challenge",
+    challengerId,
+    claimantId,
+    claim,
+    proved: held >= 0,
+  });
+
   if (held >= 0) {
     swapForFreshCard(state, claimant, held);
     state.pendingLosses.push({ playerId: challengerId, reason: "failed_challenge" });
     state.resume = againstBlock ? "end_turn" : "open_block";
+    if (againstBlock) logActionFailed(state, pending, "block");
   } else {
     state.pendingLosses.push({ playerId: claimantId, reason: "failed_challenge" });
     state.resume = againstBlock ? "resolve_action" : "end_turn";
+    if (!againstBlock) logActionFailed(state, pending, "challenge");
   }
 
   settle(state);
@@ -327,6 +477,8 @@ function resolveAction(state: GameState): void {
 
   // The actor may have been eliminated by a challenge on the way here.
   if (actor && !actor.eliminated) {
+    state.log.push({ type: "action_resolved", actorId: actor.id, action: pending.action });
+
     switch (pending.action) {
       case "income":
         actor.coins += 1;
@@ -406,7 +558,7 @@ function loseInfluence(state: GameState, playerId: string, cardIndex: number): A
   const player = getPlayer(state, playerId)!;
   if (cardIndex < 0 || cardIndex >= player.hand.length) return fail("invalid_card");
 
-  reveal(player, cardIndex);
+  reveal(state, player, cardIndex, state.pendingLosses[0]!.reason);
   state.pendingLosses.shift();
 
   settle(state);
@@ -414,10 +566,33 @@ function loseInfluence(state: GameState, playerId: string, cardIndex: number): A
 }
 
 /** Moves one card from a player's hand to their face-up pile, eliminating them if it was their last. */
-function reveal(player: PlayerState, cardIndex: number): void {
+function reveal(
+  state: GameState,
+  player: PlayerState,
+  cardIndex: number,
+  reason: LossReason,
+): void {
   const [card] = player.hand.splice(cardIndex, 1);
   player.revealed.push(card!);
-  if (player.hand.length === 0) player.eliminated = true;
+  state.log.push({ type: "influence_lost", playerId: player.id, card: card!, reason });
+
+  if (player.hand.length === 0) {
+    player.eliminated = true;
+    state.log.push({ type: "eliminated", playerId: player.id });
+  }
+}
+
+function logActionFailed(
+  state: GameState,
+  pending: PendingAction,
+  cause: "challenge" | "block",
+): void {
+  state.log.push({
+    type: "action_failed",
+    actorId: pending.actorId,
+    action: pending.action,
+    cause,
+  });
 }
 
 /**
@@ -440,7 +615,7 @@ function settle(state: GameState): void {
       return;
     }
 
-    reveal(player, 0);
+    reveal(state, player, 0, loss.reason);
     state.pendingLosses.shift();
   }
 
@@ -462,15 +637,24 @@ function settle(state: GameState): void {
 function endTurn(state: GameState): void {
   state.pending = null;
   state.exchange = null;
-  const living = livingPlayers(state);
-  if (living.length <= 1) {
-    state.phase = "game_over";
-    state.winnerId = living[0]?.id ?? null;
-    return;
-  }
+  if (checkGameOver(state)) return;
 
   advanceTurn(state);
   state.phase = "awaiting_action";
+}
+
+/** Last player holding influence wins. Checked after every loss, not just at end of turn. */
+function checkGameOver(state: GameState): boolean {
+  const living = livingPlayers(state);
+  if (living.length > 1) return false;
+
+  state.phase = "game_over";
+  state.winnerId = living[0]?.id ?? null;
+  state.pending = null;
+  state.exchange = null;
+  state.pendingLosses = [];
+  state.log.push({ type: "game_over", winnerId: state.winnerId });
+  return true;
 }
 
 function advanceTurn(state: GameState): void {

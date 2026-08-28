@@ -1,17 +1,6 @@
-import type { ActionType, Card } from "@coup/shared";
+import type { ActionType, Card, LogEntry, LossReason, Phase, TimerSetting } from "@coup/shared";
 
-export type Phase =
-  | "lobby"
-  | "awaiting_action"
-  | "awaiting_action_challenge"
-  | "awaiting_block"
-  | "awaiting_block_challenge"
-  | "awaiting_influence_loss"
-  | "awaiting_exchange"
-  | "game_over";
-
-/** Why a player owes an influence. Carried into the public log. */
-export type LossReason = "coup" | "assassinate" | "failed_challenge";
+export type { LogEntry, LossReason, Phase };
 
 export interface PendingLoss {
   playerId: string;
@@ -56,7 +45,12 @@ export interface PlayerState {
   connected: boolean;
 }
 
+export interface GameConfig {
+  timerSeconds: TimerSetting;
+}
+
 export interface GameState {
+  config: GameConfig;
   phase: Phase;
   hostId: string | null;
   players: PlayerState[];
@@ -80,6 +74,7 @@ export interface GameState {
    */
   resume: ResumeStep | null;
   winnerId: string | null;
+  log: LogEntry[];
   /** Current PRNG position, so the engine stays deterministic across commands. */
   rngSeed: number;
 }
@@ -94,7 +89,11 @@ export type Command =
   | { type: "BLOCK"; playerId: string; claim: Card }
   | { type: "PASS"; playerId: string }
   | { type: "TIMEOUT" }
-  | { type: "EXCHANGE_KEEP"; playerId: string; keepIndices: number[] };
+  | { type: "EXCHANGE_KEEP"; playerId: string; keepIndices: number[] }
+  | { type: "SET_CONNECTED"; playerId: string; connected: boolean }
+  | { type: "SET_CONFIG"; playerId: string; timerSeconds: TimerSetting }
+  | { type: "FORFEIT"; playerId: string; byId: string }
+  | { type: "RESTART"; playerId: string };
 
 export type ApplyResult =
   | { ok: true; state: GameState }
