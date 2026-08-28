@@ -1,0 +1,141 @@
+// @vitest-environment jsdom
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import appServer from "@coup/server/src/index.js";
+import { App } from "../src/App.js";
+
+// Must match VITE_SERVER_URL in vitest.config.ts, which is what the app reads.
+const PORT = 2596;
+
+beforeAll(async () => await appServer.listen(PORT));
+afterAll(async () => await appServer.gracefullyShutdown(false));
+afterEach(() => cleanup());
+
+/** Renders the whole app as a player would see it, in its own DOM container. */
+function open() {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const view = render(<App />, { container });
+  return { ...view, ui: within(container), user: userEvent.setup({ document }) };
+}
+
+async function hostGame(name: string) {
+  const app = open();
+  await app.user.type(app.ui.getByLabelText("Your name"), name);
+  await app.user.click(app.ui.getByRole("button", { name: "Host a game" }));
+
+  const chip = await app.ui.findByText(/^[A-Z2-9]{5}$/, {}, { timeout: 5000 });
+  return { app, code: chip.textContent! };
+}
+
+async function joinGame(code: string, name: string) {
+  const app = open();
+  await app.user.type(app.ui.getByLabelText("Your name"), name);
+  await app.user.type(app.ui.getByLabelText("Or join with a code"), code);
+  await app.user.click(app.ui.getByRole("button", { name: "Join" }));
+  return app;
+}
+
+describe("the app against a live backend", () => {
+  test("the landing screen asks for a name before doing anything", () => {
+    const app = open();
+
+    expect(app.ui.getByRole("heading", { name: "Coup" })).toBeTruthy();
+    expect(app.ui.getByRole("button", { name: "Host a game" })).toHaveProperty("disabled", true);
+  });
+
+  test("hosting reaches the waiting room and shows a shareable code", async () => {
+    const { app, code } = await hostGame("Alice");
+
+    expect(code).toMatch(/^[A-Z2-9]{5}$/);
+    expect(app.ui.getByRole("heading", { name: "Waiting room" })).toBeTruthy();
+    expect(app.ui.getByText("Alice")).toBeTruthy();
+  });
+
+  test("a wrong code shows a readable error instead of failing silently", async () => {
+    const app = await joinGame("ZZZZZ", "Bob");
+
+    expect(await app.ui.findByText("No game with that code.", {}, { timeout: 5000 })).toBeTruthy();
+  });
+
+  test("a second player joining appears in the host's waiting room", async () => {
+    const { app: host, code } = await hostGame("Alice");
+
+    const guest = await joinGame(code, "Bob");
+
+    await waitFor(() => expect(host.ui.getByText("Bob")).toBeTruthy(), { timeout: 5000 });
+    expect(await guest.ui.findByRole("heading", { name: "Waiting room" })).toBeTruthy();
+    // Only the host may start.
+    expect(guest.ui.getByRole("button", { name: "Waiting for host" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+  });
+
+  test("the host starts the game and both players reach the board", async () => {
+    const { app: host, code } = await hostGame("Alice");
+    const guest = await joinGame(code, "Bob");
+    await waitFor(() => expect(host.ui.getByText("Bob")).toBeTruthy(), { timeout: 5000 });
+
+    await host.user.click(host.ui.getByRole("button", { name: "Start game" }));
+
+    // The board shows each player's coins, and each client sees its own two cards.
+    for (const app of [host, guest]) {
+      await waitFor(() => expect(app.ui.getAllByText("2 coins")).toHaveLength(2), { timeout: 5000 });
+      expect(app.ui.getByText("Your influence")).toBeTruthy();
+      expect(app.ui.getByText("Log")).toBeTruthy();
+    }
+  });
+
+  test("only the player on turn is offered actions", async () => {
+    const { app: host, code } = await hostGame("Alice");
+    const guest = await joinGame(code, "Bob");
+    await waitFor(() => expect(host.ui.getByText("Bob")).toBeTruthy(), { timeout: 5000 });
+    await host.user.click(host.ui.getByRole("button", { name: "Start game" }));
+    await waitFor(() => expect(host.ui.getByText("Your influence")).toBeTruthy(), { timeout: 5000 });
+
+    const onTurn = host.ui.queryByText("Your turn — choose an action") ? host : guest;
+    const waiting = onTurn === host ? guest : host;
+
+    expect(onTurn.ui.getByRole("button", { name: /Income/ })).toBeTruthy();
+    expect(waiting.ui.queryByRole("button", { name: /Income/ })).toBeNull();
+    expect(waiting.ui.getByText(/Waiting for/)).toBeTruthy();
+  });
+
+  test("taking income updates coins and the log for both players", async () => {
+    const { app: host, code } = await hostGame("Alice");
+    const guest = await joinGame(code, "Bob");
+    await waitFor(() => expect(host.ui.getByText("Bob")).toBeTruthy(), { timeout: 5000 });
+    await host.user.click(host.ui.getByRole("button", { name: "Start game" }));
+    await waitFor(() => expect(host.ui.getByText("Your influence")).toBeTruthy(), { timeout: 5000 });
+
+    const onTurn = host.ui.queryByText("Your turn — choose an action") ? host : guest;
+    await onTurn.user.click(onTurn.ui.getByRole("button", { name: /Income/ }));
+
+    await waitFor(() => expect(host.ui.getByText("3 coins")).toBeTruthy(), { timeout: 5000 });
+    // The log records both the declaration and its resolution.
+    expect(host.ui.getAllByText(/Income/).length).toBeGreaterThan(0);
+    await waitFor(() => expect(guest.ui.getByText("3 coins")).toBeTruthy(), { timeout: 5000 });
+  });
+
+  test("a character action opens a challenge window for the other player", async () => {
+    const { app: host, code } = await hostGame("Alice");
+    const guest = await joinGame(code, "Bob");
+    await waitFor(() => expect(host.ui.getByText("Bob")).toBeTruthy(), { timeout: 5000 });
+    await host.user.click(host.ui.getByRole("button", { name: "Start game" }));
+    await waitFor(() => expect(host.ui.getByText("Your influence")).toBeTruthy(), { timeout: 5000 });
+
+    const onTurn = host.ui.queryByText("Your turn — choose an action") ? host : guest;
+    const other = onTurn === host ? guest : host;
+    await onTurn.user.click(onTurn.ui.getByRole("button", { name: /^Tax/ }));
+
+    expect(
+      await other.ui.findByRole("button", { name: "Challenge" }, { timeout: 5000 }),
+    ).toBeTruthy();
+    expect(other.ui.getByText(/claims Duke to Tax/)).toBeTruthy();
+
+    await other.user.click(other.ui.getByRole("button", { name: "Pass" }));
+    await waitFor(() => expect(onTurn.ui.getByText("5 coins")).toBeTruthy(), { timeout: 5000 });
+  });
+});

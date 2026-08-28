@@ -1,0 +1,371 @@
+/*
+ * One muted dark palette. Colour carries meaning and nothing else: the accent marks
+ * whose turn it is and the primary action, danger marks losing influence. Everything
+ * else is greyscale so the game state is what draws the eye.
+ */
+:root {
+  --bg: #16181c;
+  --surface: #1e2127;
+  --surface-raised: #262a32;
+  --border: #333944;
+  --border-strong: #454d5c;
+
+  --text: #dfe3ea;
+  --text-dim: #98a1b0;
+  --text-faint: #6b7484;
+
+  --accent: #7c9cc4;
+  --accent-dim: #2c3946;
+  --danger: #c48080;
+  --danger-dim: #3d2c2f;
+
+  --radius: 10px;
+  --radius-sm: 7px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 9px 16px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  color: var(--text-faint);
+  border-color: var(--border);
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+button.danger:hover:not(:disabled) {
+  border-color: var(--danger);
+}
+
+input {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 10px 13px;
+  width: 100%;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ---------------------------------------------------------------- layout */
+
+.centered {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 100%;
+  max-width: 380px;
+}
+
+.panel h1 {
+  margin: 0 0 4px;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  margin: 0 0 22px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 18px 0;
+}
+
+.error {
+  margin-top: 12px;
+  padding: 9px 12px;
+  background: var(--danger-dim);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.muted {
+  color: var(--text-dim);
+}
+
+.faint {
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+/* ---------------------------------------------------------------- game */
+
+.game {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 18px;
+  padding: 18px;
+  max-width: 1180px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.topbar {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.code-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.14em;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+}
+
+.seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.seat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  border-radius: var(--radius);
+  padding: 13px 15px;
+}
+
+/* Whose turn it is: the one place an accent appears in the seat list. */
+.seat.active {
+  border-color: var(--border-strong);
+  border-left-color: var(--accent);
+  background: var(--surface-raised);
+}
+
+.seat.out {
+  opacity: 0.5;
+}
+
+.seat-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.seat-name {
+  font-weight: 600;
+}
+
+.seat-meta {
+  margin-top: 7px;
+  display: flex;
+  gap: 14px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.turn-tag {
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.revealed {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.card-tag {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 3px 9px;
+  font-size: 13px;
+}
+
+.card-tag.dead {
+  color: var(--text-faint);
+  border-style: dashed;
+}
+
+.card-tag.selected {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.hand {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hand button {
+  min-width: 118px;
+}
+
+/* Log, top right. */
+.log {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  max-height: 66vh;
+  overflow-y: auto;
+  position: sticky;
+  top: 18px;
+}
+
+.log h2 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
+.log ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.log li {
+  font-size: 13.5px;
+  color: var(--text-dim);
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border);
+}
+
+.log li:last-child {
+  border-bottom: none;
+  color: var(--text);
+}
+
+.prompt {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.prompt-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.deadline {
+  color: var(--text-faint);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.section-label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.player-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.player-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 820px) {
+  .game {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .log {
+    position: static;
+    max-height: 260px;
+  }
+}
