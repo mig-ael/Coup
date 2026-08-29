@@ -239,15 +239,65 @@ function setConnected(state: GameState, playerId: string, connected: boolean): A
   if (!player) return fail("unknown_player");
 
   player.connected = connected;
+  if (connected || state.phase === "lobby" || state.phase === "game_over") {
+    return { ok: true, state };
+  }
 
   // A player who is gone cannot answer an open window, and with no timer configured
   // nothing else would ever close it.
-  if (!connected && state.pending && inWindow(state)) {
+  if (state.pending && inWindow(state)) {
     state.pending.awaiting = state.pending.awaiting.filter((id) => id !== playerId);
     if (state.pending.awaiting.length === 0) closeWindow(state);
   }
 
+  // Nothing may sit waiting on someone who is not there: their turn is skipped, and
+  // any decision the table owes them is taken on their behalf.
+  if (state.phase === "awaiting_action" && currentPlayerId(state) === playerId) {
+    endTurn(state);
+  } else if (
+    state.phase === "awaiting_influence_loss" &&
+    state.pendingLosses[0]?.playerId === playerId
+  ) {
+    settle(state);
+  } else if (state.phase === "awaiting_exchange" && state.exchange?.playerId === playerId) {
+    autoResolveExchange(state, player);
+  }
+
+  checkTableAbandoned(state);
+
   return { ok: true, state };
+}
+
+/** Keeps the cards they held before drawing, returning the rest. */
+function autoResolveExchange(state: GameState, player: PlayerState): void {
+  const keepCount = state.exchange?.keepCount ?? player.hand.length;
+  const returned = player.hand.splice(keepCount);
+
+  const rng = createRng(state.rngSeed);
+  state.deck = shuffle([...state.deck, ...returned], rng);
+  state.rngSeed = rng.seed;
+
+  state.exchange = null;
+  settle(state);
+}
+
+/**
+ * A game needs at least two players who are actually present. Once everyone but one
+ * has dropped there is no game left to play, so it is awarded to whoever is still
+ * here rather than left running against opponents who cannot act.
+ */
+function checkTableAbandoned(state: GameState): void {
+  if (state.phase === "lobby" || state.phase === "game_over") return;
+
+  const present = livingPlayers(state).filter((p) => p.connected);
+  if (present.length > 1) return;
+
+  state.phase = "game_over";
+  state.winnerId = present[0]?.id ?? null;
+  state.pending = null;
+  state.exchange = null;
+  state.pendingLosses = [];
+  state.log.push({ type: "game_over", winnerId: state.winnerId });
 }
 
 /**
@@ -610,7 +660,8 @@ function settle(state: GameState): void {
       continue;
     }
 
-    if (player.hand.length > 1) {
+    // Only prompt someone who is actually there to answer.
+    if (player.hand.length > 1 && player.connected) {
       state.phase = "awaiting_influence_loss";
       return;
     }
@@ -657,11 +708,16 @@ function checkGameOver(state: GameState): boolean {
   return true;
 }
 
+/**
+ * Passes play to the next player who can actually take a turn. Someone who has
+ * dropped is stepped over for as long as they are away, and picks up again on their
+ * next turn once they reconnect.
+ */
 function advanceTurn(state: GameState): void {
   for (let i = 1; i <= state.turnOrder.length; i++) {
     const index = (state.currentTurnIndex + i) % state.turnOrder.length;
     const candidate = getPlayer(state, state.turnOrder[index]!);
-    if (candidate && !candidate.eliminated) {
+    if (candidate && !candidate.eliminated && candidate.connected) {
       state.currentTurnIndex = index;
       return;
     }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ActionType, Card } from "@coup/shared";
 import { ActionLog } from "../components/ActionLog.js";
 import { CardFace } from "../components/CardFace.js";
-import { CardInfoModal } from "../components/CardInfoModal.js";
+import { ActionsModal } from "../components/ActionsModal.js";
 import { PromptPanel } from "../components/PromptPanel.js";
 import { Seat } from "../components/Seat.js";
 import { derivePrompt } from "../game/prompt.js";
@@ -26,14 +26,10 @@ interface Props {
 
 export function Game(props: Props) {
   const { view, hand, error } = props;
-  // The character reference is reachable at any point, either from the header or by
-  // tapping any card on the table.
-  const [inspecting, setInspecting] = useState<Card | null>(null);
+  // The actions reference is reachable at any point: from the header, or by tapping
+  // any card on the table.
   const [referenceOpen, setReferenceOpen] = useState(false);
-  const openReference = (card: Card | null) => {
-    setInspecting(card);
-    setReferenceOpen(true);
-  };
+  const openReference = () => setReferenceOpen(true);
   const nameOf = (id: string | null) =>
     view.players.find((p) => p.id === id)?.name ?? "another player";
 
@@ -52,7 +48,7 @@ export function Game(props: Props) {
           <span className="muted">
             {over ? `${nameOf(view.winnerId)} wins` : `${nameOf(turnId)}'s turn`}
           </span>
-          <button onClick={() => openReference(null)}>Characters</button>
+          <button onClick={openReference}>Actions</button>
         </div>
       </header>
 
@@ -68,7 +64,7 @@ export function Game(props: Props) {
               // Only the host, only mid-game, and only for someone actually away.
               canForfeit={isHost && !over && !player.connected && !player.eliminated}
               onForfeit={() => props.onForfeit(player.id)}
-              onInspect={openReference}
+              onInspect={() => openReference()}
             />
           ))}
         </section>
@@ -115,7 +111,7 @@ export function Game(props: Props) {
             ) : (
               <div className="hand">
                 {hand.map((card, i) => (
-                  <CardFace key={i} card={card} actionLabel="What it does" onClick={() => openReference(card)} />
+                  <CardFace key={i} card={card} actionLabel="What it does" onClick={openReference} />
                 ))}
               </div>
             )}
@@ -127,9 +123,7 @@ export function Game(props: Props) {
 
       <ActionLog log={view.log} nameOf={nameOf} />
 
-      {referenceOpen && (
-        <CardInfoModal focus={inspecting} onClose={() => setReferenceOpen(false)} />
-      )}
+      {referenceOpen && <ActionsModal onClose={() => setReferenceOpen(false)} />}
     </div>
   );
 }

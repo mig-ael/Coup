@@ -83,6 +83,22 @@ button.danger:hover:not(:disabled) {
   border-color: var(--danger);
 }
 
+/*
+ * Navigation rather than choice — Back, Pass, Close. Recessed so it never reads as
+ * one of the options beside it, which matters most where the other buttons are
+ * players' names and picking the wrong one costs you a turn.
+ */
+button.secondary {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-dim);
+}
+
+button.secondary:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
 input {
   color: var(--text);
   background: var(--surface);
@@ -228,11 +244,16 @@ input:focus {
   padding: 13px 15px;
 }
 
-/* Whose turn it is: the one place an accent appears in the seat list. */
+/*
+ * Whose turn it is. With no label to lean on, the highlight has to carry it alone:
+ * accent border all the way round, a lifted surface, and a soft ring to separate it
+ * from the seats either side.
+ */
 .seat.active {
-  border-color: var(--border-strong);
+  border-color: var(--accent);
   border-left-color: var(--accent);
   background: var(--surface-raised);
+  box-shadow: 0 0 0 1px var(--accent-dim);
 }
 
 .seat.out {
@@ -597,5 +618,91 @@ input:focus {
   .card {
     width: 100%;
     min-height: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- reference grid */
+
+.modal-wide {
+  max-width: 720px;
+}
+
+.grid-table {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.7fr) auto minmax(0, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.grid-table-blocks {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+}
+
+.grid-head {
+  background: var(--surface-raised);
+  padding: 9px 12px;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* Each action is one row across every column, tinted by the character it claims. */
+.grid-row-group {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  gap: 1px;
+}
+
+.grid-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--tint-bg, var(--surface));
+  padding: 11px 12px;
+  font-size: 13.5px;
+  color: var(--text-dim);
+  border-left: 0;
+}
+
+.grid-row-group .grid-cell:first-child {
+  border-left: 3px solid var(--tint, transparent);
+}
+
+.grid-action {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.chip-claim {
+  border: 1px solid var(--tint, var(--border-strong));
+  color: var(--tint, var(--text-dim));
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 12px;
+}
+
+@media (max-width: 560px) {
+  .grid-table,
+  .grid-table-blocks {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  /* Column headings stop making sense once rows wrap to two columns. */
+  .grid-head {
+    display: none;
+  }
+
+  .grid-row-group {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .grid-row-group .grid-cell:first-child {
+    grid-column: 1 / -1;
   }
 }

@@ -50,7 +50,9 @@ choices were made deliberately:
 - A player holding **0 coins is not a valid Steal target**.
 - Eliminated players stay and watch; nobody may join a game already in progress.
 - Block and challenge windows have **no timer by default**. The host may set 15s, 30s, or 60s in the lobby; with no timer, a window stays open until every eligible player passes.
-- A disconnected player is auto-passed out of response windows. If they drop on their own turn the game pauses, and after a grace period the host may forfeit them (surrendering both influence).
+- A disconnected player is **auto-passed** out of response windows, **skipped** when their turn comes round, and has any card choice taken for them. They keep their seat and cards, and resume play on reconnecting.
+- A game needs two connected players. Once only one is left, it ends and is awarded to them — so in a two-player game, one person dropping ends it.
+- The host can still forfeit a disconnected player (surrendering both influence) to remove them from a larger game.
 
 ## Deploying
 

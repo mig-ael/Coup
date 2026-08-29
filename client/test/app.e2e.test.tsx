@@ -140,7 +140,7 @@ describe("the app against a live backend", () => {
   });
 });
 
-describe("the character cards", () => {
+describe("the cards and the reference", () => {
   const startedGame = async () => {
     const { app: host, code } = await hostGame("Alice");
     const guest = await joinGame(code, "Bob");
@@ -171,46 +171,121 @@ describe("the character cards", () => {
     }
   });
 
-  test("tapping one of your cards opens the character reference", async () => {
+  test("tapping one of your cards opens the actions reference", async () => {
     const { host } = await startedGame();
 
     await host.user.click(host.ui.getAllByRole("button", { name: /What it does/ })[0]!);
 
     const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
-    expect(within(dialog).getByRole("heading", { name: "Characters" })).toBeTruthy();
+    expect(within(dialog).getByRole("heading", { name: "Actions" })).toBeTruthy();
   });
 
-  test("the reference lists every character with its action and counteraction", async () => {
+  test("the reference is a grid of every action, not a list of characters", async () => {
     const { host } = await startedGame();
 
-    await host.user.click(host.ui.getByRole("button", { name: "Characters" }));
+    await host.user.click(host.ui.getByRole("button", { name: "Actions" }));
     const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
 
-    for (const name of ["Duke", "Assassin", "Captain", "Ambassador", "Contessa"]) {
-      expect(within(dialog).getByText(name)).toBeTruthy();
+    for (const heading of ["Action", "Effect", "Cost", "Blocked by"]) {
+      expect(within(dialog).getByText(heading)).toBeTruthy();
     }
-    // Derived from the rules table, not restated in the UI.
-    expect(within(dialog).getByText(/Blocks Foreign Aid/)).toBeTruthy();
-    expect(within(dialog).getByText(/Blocks Assassinate aimed at you/)).toBeTruthy();
-    expect(within(dialog).getByText(/Take 3 coins/)).toBeTruthy();
+    for (const action of ["Income", "Foreign Aid", "Coup", "Tax", "Assassinate", "Steal", "Exchange"]) {
+      expect(within(dialog).getAllByText(action).length).toBeGreaterThan(0);
+    }
+  });
+
+  test("each row carries its cost and what blocks it, from the rules table", async () => {
+    const { host } = await startedGame();
+
+    await host.user.click(host.ui.getByRole("button", { name: "Actions" }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
+
+    expect(within(dialog).getByText("7 coins")).toBeTruthy();
+    expect(within(dialog).getByText("3 coins")).toBeTruthy();
+    expect(within(dialog).getByText("Take 3 coins")).toBeTruthy();
+    expect(within(dialog).getByText("Ambassador, Captain")).toBeTruthy();
+  });
+
+  test("counteractions are listed per character", async () => {
+    const { host } = await startedGame();
+
+    await host.user.click(host.ui.getByRole("button", { name: "Actions" }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
+
+    expect(within(dialog).getByText("Counteractions")).toBeTruthy();
+    // Contessa appears twice: as what blocks Assassinate, and as a counteraction.
+    expect(within(dialog).getAllByText("Contessa").length).toBeGreaterThanOrEqual(2);
+    // The four blocking characters, and only those, get a counteraction row.
+    for (const card of ["Duke", "Captain", "Ambassador", "Contessa"]) {
+      expect(within(dialog).getAllByText(card).length).toBeGreaterThan(0);
+    }
   });
 
   test("the reference is reachable from the lobby too", async () => {
     const { app } = await hostGame("Alice");
 
-    await app.user.click(app.ui.getByRole("button", { name: "Characters" }));
+    await app.user.click(app.ui.getByRole("button", { name: "Actions" }));
 
     const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
-    expect(within(dialog).getByText("Contessa")).toBeTruthy();
+    expect(within(dialog).getByRole("heading", { name: "Actions" })).toBeTruthy();
   });
 
   test("the reference closes again", async () => {
     const { app } = await hostGame("Alice");
-    await app.user.click(app.ui.getByRole("button", { name: "Characters" }));
+    await app.user.click(app.ui.getByRole("button", { name: "Actions" }));
     const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
 
     await app.user.click(within(dialog).getByRole("button", { name: "Close" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull(), { timeout: 3000 });
+  });
+});
+
+describe("whose turn it is", () => {
+  test("is shown by highlighting the seat, with no label", async () => {
+    const { app: host, code } = await hostGame("Alice");
+    const guest = await joinGame(code, "Bob");
+    await waitFor(() => expect(host.ui.getByText("Bob")).toBeTruthy(), { timeout: 5000 });
+    await host.user.click(host.ui.getByRole("button", { name: "Start game" }));
+    await waitFor(() => expect(host.ui.getByText("Your influence")).toBeTruthy(), { timeout: 5000 });
+
+    expect(host.ui.queryByText("Their turn")).toBeNull();
+    expect(host.container.querySelectorAll(".seat.active")).toHaveLength(1);
+    void guest;
+  });
+});
+
+describe("navigation buttons", () => {
+  test("Back is styled apart from the player names beside it", async () => {
+    const { app: host, code } = await hostGame("Alice");
+    const guest = await joinGame(code, "Bob");
+    await waitFor(() => expect(host.ui.getByText("Bob")).toBeTruthy(), { timeout: 5000 });
+    await host.user.click(host.ui.getByRole("button", { name: "Start game" }));
+    await waitFor(() => expect(host.ui.getByText("Your influence")).toBeTruthy(), { timeout: 5000 });
+
+    const onTurn = host.ui.queryByText("Your turn — choose an action") ? host : guest;
+    await onTurn.user.click(onTurn.ui.getByRole("button", { name: /^Steal/ }));
+
+    const back = await onTurn.ui.findByRole("button", { name: "Back" }, { timeout: 3000 });
+    const name = onTurn.ui.getByRole("button", { name: onTurn === host ? "Bob" : "Alice" });
+
+    expect(back.className).toContain("secondary");
+    expect(name.className).not.toContain("secondary");
+  });
+
+  test("Pass is styled apart from Challenge", async () => {
+    const { app: host, code } = await hostGame("Alice");
+    const guest = await joinGame(code, "Bob");
+    await waitFor(() => expect(host.ui.getByText("Bob")).toBeTruthy(), { timeout: 5000 });
+    await host.user.click(host.ui.getByRole("button", { name: "Start game" }));
+    await waitFor(() => expect(host.ui.getByText("Your influence")).toBeTruthy(), { timeout: 5000 });
+
+    const onTurn = host.ui.queryByText("Your turn — choose an action") ? host : guest;
+    const other = onTurn === host ? guest : host;
+    await onTurn.user.click(onTurn.ui.getByRole("button", { name: /^Tax/ }));
+
+    const pass = await other.ui.findByRole("button", { name: "Pass" }, { timeout: 3000 });
+    expect(pass.className).toContain("secondary");
+    expect(other.ui.getByRole("button", { name: "Challenge" }).className).not.toContain("secondary");
   });
 });

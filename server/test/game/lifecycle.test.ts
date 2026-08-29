@@ -53,12 +53,12 @@ describe("disconnecting", () => {
     expect(state.phase).toBe("awaiting_action");
   });
 
-  test("does not skip the disconnected player's own turn", () => {
+  test("skips the turn of a player who drops while on it", () => {
     let state = startedGame({});
 
     state = ok(state, { type: "SET_CONNECTED", playerId: "alice", connected: false });
 
-    expect(currentPlayerId(state)).toBe("alice");
+    expect(currentPlayerId(state)).toBe("bob");
     expect(state.phase).toBe("awaiting_action");
   });
 
@@ -107,14 +107,17 @@ describe("forfeiting", () => {
     expect(state.phase).toBe("awaiting_action");
   });
 
-  test("forfeiting the last opponent ends the game", () => {
-    let state = startedGame({ players: ["Alice", "Bob"] });
+  test("forfeiting leaves the remaining players to carry on", () => {
+    // A forfeit can no longer end a game: the case where it once did — two live
+    // players, one of them gone — now ends on the disconnect itself.
+    let state = startedGame({ players: ["Alice", "Bob", "Carol", "Dan"] });
     state = ok(state, { type: "SET_CONNECTED", playerId: "bob", connected: false });
 
     state = ok(state, { type: "FORFEIT", playerId: "bob", byId: "alice" });
 
-    expect(state.phase).toBe("game_over");
-    expect(state.winnerId).toBe("alice");
+    expect(p(state, "bob").eliminated).toBe(true);
+    expect(state.phase).toBe("awaiting_action");
+    expect(state.winnerId).toBeNull();
   });
 });
 

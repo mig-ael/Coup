@@ -50,7 +50,7 @@ export function PromptPanel(props: Props) {
                 Block with {card}
               </button>
             ))}
-            <button onClick={props.onPass}>Pass</button>
+            <button className="secondary" onClick={props.onPass}>Pass</button>
           </div>
         </div>
       );
@@ -97,7 +97,7 @@ function ChooseAction({
               {nameOf(id)}
             </button>
           ))}
-          <button onClick={() => setPicking(null)}>Back</button>
+          <button className="secondary" onClick={() => setPicking(null)}>Back</button>
         </div>
       </div>
     );

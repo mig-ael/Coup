@@ -21,7 +21,6 @@ export function Seat({ player, isYou, isTurn, isHost, canForfeit, onForfeit, onI
           {player.name}
           {isYou && <span className="faint"> — you</span>}
         </span>
-        {isTurn && !player.eliminated && <span className="turn-tag">Their turn</span>}
         {player.eliminated && <span className="faint">out</span>}
       </div>
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { MIN_PLAYERS, TIMER_OPTIONS, type TimerSetting } from "@coup/shared";
-import { CardInfoModal } from "../components/CardInfoModal.js";
+import { ActionsModal } from "../components/ActionsModal.js";
 import { errorText } from "../messages.js";
 import type { Snapshot } from "../net/session.js";
 
@@ -73,14 +73,14 @@ export function Lobby({ view, error, onSetTimer, onStart, onLeave }: Props) {
         </div>
 
         <div className="row" style={{ marginTop: 10, justifyContent: "center" }}>
-          <button onClick={() => setReferenceOpen(true)}>Characters</button>
+          <button onClick={() => setReferenceOpen(true)}>Actions</button>
         </div>
 
         {isHost && !enough && <p className="faint" style={{ marginTop: 10 }}>Need at least {MIN_PLAYERS} players.</p>}
         {error && <p className="error">{errorText(error)}</p>}
       </div>
 
-      {referenceOpen && <CardInfoModal focus={null} onClose={() => setReferenceOpen(false)} />}
+      {referenceOpen && <ActionsModal onClose={() => setReferenceOpen(false)} />}
     </div>
   );
 }

@@ -283,9 +283,11 @@ describe("reconnection", () => {
   });
 
   test("the host may forfeit a player who does not come back", async () => {
+    // Three players, because a two-player game ends the moment one of them drops.
     const alice = await host("Alice");
     const bob = await join(alice.roomId, "Bob");
-    await until(() => alice.state.players.length === 2, "two seated");
+    await join(alice.roomId, "Carol");
+    await until(() => alice.state.players.length === 3, "three seated");
 
     alice.send("start_game", {});
     await until(() => alice.state.phase === "awaiting_action", "started");
@@ -297,10 +299,26 @@ describe("reconnection", () => {
     );
 
     alice.send("forfeit", { playerId: bob.sessionId });
-    await until(() => alice.state.phase === "game_over", "game ended");
+    await until(
+      () => [...alice.state.players].find((p) => p.id === bob.sessionId)?.eliminated === true,
+      "bob forfeited",
+    );
 
+    expect(alice.state.phase).toBe("awaiting_action");
+  });
+
+  test("a two-player game ends when one player drops", async () => {
+    const alice = await host("Alice");
+    const bob = await join(alice.roomId, "Bob");
+    await until(() => alice.state.players.length === 2, "two seated");
+
+    alice.send("start_game", {});
+    await until(() => alice.state.phase === "awaiting_action", "started");
+
+    await bob.leave(false);
+
+    await until(() => alice.state.phase === "game_over", "game ended");
     expect(alice.state.winnerId).toBe(alice.sessionId);
-    expect([...alice.state.players].find((p) => p.id === bob.sessionId)?.eliminated).toBe(true);
   });
 });
 
