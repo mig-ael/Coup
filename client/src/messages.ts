@@ -22,10 +22,17 @@ const ERRORS: Record<string, string> = {
   player_connected: "That player is still connected.",
   already_eliminated: "That player is already out.",
   could_not_connect: "Could not reach the server.",
+  server_unreachable:
+    "Could not reach the game server. It may be asleep — wait a minute and try again.",
 };
 
+/**
+ * A known code becomes plain words. Anything else is shown as-is: an unmapped
+ * failure is usually a deployment or network problem, and hiding it behind
+ * "Something went wrong" makes that impossible to tell apart from a bug.
+ */
 export function errorText(code: string): string {
-  return ERRORS[code] ?? "Something went wrong.";
+  return ERRORS[code] ?? (code || "Something went wrong.");
 }
 
 /** One line of public history. Never mentions a card that is not face up. */

@@ -189,6 +189,14 @@ input:focus {
   font-size: 14px;
 }
 
+.error-detail {
+  margin: 6px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+  word-break: break-all;
+}
+
 .muted {
   color: var(--text-dim);
 }

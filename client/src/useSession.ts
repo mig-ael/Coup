@@ -4,7 +4,11 @@ import { Session, serverEndpoint, type Snapshot } from "./net/session.js";
 
 export type Status = "idle" | "connecting" | "connected";
 
+/** The backend this build was compiled against. */
+export const ENDPOINT = serverEndpoint();
+
 export interface SessionState {
+  endpoint: string;
   status: Status;
   view: Snapshot | null;
   hand: Card[];
@@ -35,7 +39,7 @@ export function useSession(): SessionState {
       setError(null);
       setStatus("connecting");
 
-      const created = new Session(serverEndpoint(), {
+      const created = new Session(ENDPOINT, {
         onState: setView,
         onHand: setHand,
         onError: setError,
@@ -61,6 +65,7 @@ export function useSession(): SessionState {
   }, []);
 
   return {
+    endpoint: ENDPOINT,
     status,
     view,
     hand,
@@ -81,6 +86,10 @@ function describe(cause: unknown): string {
   const message = cause instanceof Error ? cause.message : String(cause);
 
   if (/not found|no rooms|4212|locked/i.test(message)) return "room_not_found";
+  // A free-tier server that has gone to sleep looks exactly like an unreachable one.
+  if (/failed to fetch|networkerror|econnrefused|enotfound|timeout|load failed/i.test(message)) {
+    return "server_unreachable";
+  }
   if (!message) return "could_not_connect";
   return message;
 }

@@ -59,6 +59,15 @@ describe("the app against a live backend", () => {
     expect(await app.ui.findByText("No game with that code.", {}, { timeout: 5000 })).toBeTruthy();
   });
 
+  test("an error names the server the build is pointed at", async () => {
+    const app = await joinGame("ZZZZZ", "Bob");
+    await app.ui.findByText("No game with that code.", {}, { timeout: 5000 });
+
+    // Without this, a build still pointing at localhost is indistinguishable from a
+    // server that is down.
+    expect(app.ui.getByText(/^Server: ws:\/\//)).toBeTruthy();
+  });
+
   test("a second player joining appears in the host's waiting room", async () => {
     const { app: host, code } = await hostGame("Alice");
 

@@ -3,12 +3,13 @@ import { errorText } from "../messages.js";
 
 interface Props {
   busy: boolean;
+  endpoint: string;
   error: string | null;
   onHost: (name: string) => void;
   onJoin: (code: string, name: string) => void;
 }
 
-export function Landing({ busy, error, onHost, onJoin }: Props) {
+export function Landing({ busy, endpoint, error, onHost, onJoin }: Props) {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
 
@@ -61,7 +62,17 @@ export function Landing({ busy, error, onHost, onJoin }: Props) {
           </button>
         </div>
 
-        {error && <p className="error">{errorText(error)}</p>}
+        {error && (
+          <div className="error">
+            <p style={{ margin: 0 }}>{errorText(error)}</p>
+            {/*
+              Naming the server turns the two most common deployment mistakes into
+              something you can see: a build that still points at localhost, and one
+              using ws:// where the page is served over https.
+            */}
+            <p className="error-detail">Server: {endpoint}</p>
+          </div>
+        )}
       </div>
     </div>
   );

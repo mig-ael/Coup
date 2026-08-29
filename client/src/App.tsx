@@ -12,6 +12,7 @@ export function App() {
     return (
       <Landing
         busy={status === "connecting"}
+        endpoint={session.endpoint}
         error={session.error}
         onHost={(name) => void session.host(name)}
         onJoin={(code, name) => void session.join(code, name)}
