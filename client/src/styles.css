@@ -601,6 +601,58 @@ input:focus {
   font-weight: 600;
 }
 
+.tabs {
+  display: flex;
+  gap: 6px;
+}
+
+/* Quiet by default; the selected one is the only tab carrying the accent. */
+.tab {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  padding: 7px 14px;
+  min-height: 38px;
+}
+
+.tab:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.tab-on,
+.tab-on:hover:not(:disabled) {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.rules {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rule {
+  border-left: 2px solid var(--border-strong);
+  padding-left: 14px;
+}
+
+.rule h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text);
+}
+
+.rule p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
 .card-reference {
   display: flex;
   flex-direction: column;

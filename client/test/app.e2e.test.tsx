@@ -4,6 +4,7 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import appServer from "@coup/server/src/index.js";
 import { resetAbuseLimits } from "@coup/server/src/rooms/GameRoom.js";
+import { FORCED_COUP_THRESHOLD, MAX_PLAYERS, MIN_PLAYERS } from "@coup/shared";
 import { App } from "../src/App.js";
 
 // Must match VITE_SERVER_URL in vitest.config.ts, which is what the app reads.
@@ -39,6 +40,16 @@ async function joinGame(code: string, name: string) {
   await app.user.type(app.ui.getByLabelText("Or join with a code"), code);
   await app.user.click(app.ui.getByRole("button", { name: "Join" }));
   return app;
+}
+
+/** Two players seated and dealt, ready to act. */
+async function startedGame() {
+  const { app: host, code } = await hostGame("Alice");
+  const guest = await joinGame(code, "Bob");
+  await waitFor(() => expect(host.ui.getByText("Bob")).toBeTruthy(), { timeout: 5000 });
+  await host.user.click(host.ui.getByRole("button", { name: "Start game" }));
+  await waitFor(() => expect(host.ui.getByText("Your influence")).toBeTruthy(), { timeout: 5000 });
+  return { host, guest };
 }
 
 describe("the app against a live backend", () => {
@@ -154,15 +165,6 @@ describe("the app against a live backend", () => {
 });
 
 describe("the cards and the reference", () => {
-  const startedGame = async () => {
-    const { app: host, code } = await hostGame("Alice");
-    const guest = await joinGame(code, "Bob");
-    await waitFor(() => expect(host.ui.getByText("Bob")).toBeTruthy(), { timeout: 5000 });
-    await host.user.click(host.ui.getByRole("button", { name: "Start game" }));
-    await waitFor(() => expect(host.ui.getByText("Your influence")).toBeTruthy(), { timeout: 5000 });
-    return { host, guest };
-  };
-
   test("your own influence is shown as named character cards", async () => {
     const { host } = await startedGame();
 
@@ -190,7 +192,9 @@ describe("the cards and the reference", () => {
     await host.user.click(host.ui.getAllByRole("button", { name: /What it does/ })[0]!);
 
     const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
-    expect(within(dialog).getByRole("heading", { name: "Actions" })).toBeTruthy();
+    // Opens on the Actions tab, showing the table rather than the rules.
+    expect(within(dialog).getByRole("button", { name: "Actions" }).className).toContain("tab-on");
+    expect(within(dialog).getByText("Blocked by")).toBeTruthy();
   });
 
   test("the reference is a grid of every action, not a list of characters", async () => {
@@ -254,7 +258,7 @@ describe("the cards and the reference", () => {
     await app.user.click(app.ui.getByRole("button", { name: "Actions" }));
 
     const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
-    expect(within(dialog).getByRole("heading", { name: "Actions" })).toBeTruthy();
+    expect(within(dialog).getByText("Blocked by")).toBeTruthy();
   });
 
   test("the reference closes again", async () => {
@@ -343,5 +347,66 @@ describe("navigation buttons", () => {
     const pass = await other.ui.findByRole("button", { name: "Pass" }, { timeout: 3000 });
     expect(pass.className).toContain("secondary");
     expect(other.ui.getByRole("button", { name: "Challenge" }).className).not.toContain("secondary");
+  });
+});
+
+describe("the rules refresher", () => {
+  test("opens from the lobby beside the actions reference", async () => {
+    const { app } = await hostGame("Alice");
+
+    await app.user.click(app.ui.getByRole("button", { name: "Rules" }));
+
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
+    expect(within(dialog).getByRole("heading", { name: "The goal" })).toBeTruthy();
+  });
+
+  test("covers the basics a player would need reminding of", async () => {
+    const { app } = await hostGame("Alice");
+    await app.user.click(app.ui.getByRole("button", { name: "Rules" }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
+
+    for (const heading of [
+      "The goal",
+      "Your turn",
+      "Bluffing",
+      "Challenging a claim",
+      "Blocking",
+      "Losing influence",
+    ]) {
+      expect(within(dialog).getByRole("heading", { name: heading })).toBeTruthy();
+    }
+  });
+
+  test("its figures come from the shared constants, not prose", async () => {
+    const { app } = await hostGame("Alice");
+    await app.user.click(app.ui.getByRole("button", { name: "Rules" }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
+
+    // The forced-coup threshold and player range must track the engine.
+    expect(within(dialog).getByText(new RegExp(`${FORCED_COUP_THRESHOLD} or more coins`))).toBeTruthy();
+    expect(
+      within(dialog).getByText(new RegExp(`${MIN_PLAYERS}–${MAX_PLAYERS} players`)),
+    ).toBeTruthy();
+  });
+
+  test("you can switch between the two tabs without reopening", async () => {
+    const { app } = await hostGame("Alice");
+    await app.user.click(app.ui.getByRole("button", { name: "Rules" }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
+
+    await app.user.click(within(dialog).getByRole("button", { name: "Actions" }));
+    expect(within(dialog).getByText("Blocked by")).toBeTruthy();
+
+    await app.user.click(within(dialog).getByRole("button", { name: "Rules" }));
+    expect(within(dialog).getByRole("heading", { name: "The goal" })).toBeTruthy();
+  });
+
+  test("is reachable during a game too", async () => {
+    const { host } = await startedGame();
+
+    await host.user.click(host.ui.getByRole("button", { name: "Rules" }));
+
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
+    expect(within(dialog).getByRole("heading", { name: "The goal" })).toBeTruthy();
   });
 });
