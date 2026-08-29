@@ -707,21 +707,67 @@ input:focus {
   font-size: 12px;
 }
 
+/*
+ * Too narrow for four columns. Each action becomes its own stacked card and every
+ * value carries its own label, because without the column headings "3 coins" and
+ * "Take 3 coins" sitting side by side are impossible to tell apart.
+ */
 @media (max-width: 560px) {
   .grid-table {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: none;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
   }
 
-  /* Column headings stop making sense once rows wrap to two columns. */
   .grid-head {
     display: none;
   }
 
   .grid-row-group {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--tint, var(--border-strong));
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .grid-cell {
+    justify-content: space-between;
+    padding: 9px 12px;
+    border-left: 0;
   }
 
   .grid-row-group .grid-cell:first-child {
-    grid-column: 1 / -1;
+    border-left: 0;
+  }
+
+  .grid-cell-title {
+    background: var(--surface-raised);
+    padding: 11px 12px;
+  }
+
+  /* The value stays right-aligned against its label. */
+  .grid-cell[data-label]::before {
+    content: attr(data-label);
+    color: var(--text-faint);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-right: 12px;
+  }
+
+  .grid-cell-wide {
+    grid-column: auto;
+  }
+
+  .grid-section {
+    margin-top: 8px;
+    border-radius: var(--radius-sm);
   }
 }

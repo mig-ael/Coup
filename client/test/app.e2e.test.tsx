@@ -215,18 +215,32 @@ describe("the cards and the reference", () => {
     expect(within(dialog).getByText("Ambassador, Captain")).toBeTruthy();
   });
 
-  test("counteractions are listed per character", async () => {
+  test("counteractions sit inside the same table as the actions", async () => {
     const { host } = await startedGame();
 
     await host.user.click(host.ui.getByRole("button", { name: "Actions" }));
     const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
 
-    expect(within(dialog).getByText("Counteractions")).toBeTruthy();
-    // Contessa appears twice: as what blocks Assassinate, and as a counteraction.
-    expect(within(dialog).getAllByText("Contessa").length).toBeGreaterThanOrEqual(2);
-    // The four blocking characters, and only those, get a counteraction row.
-    for (const card of ["Duke", "Captain", "Ambassador", "Contessa"]) {
-      expect(within(dialog).getAllByText(card).length).toBeGreaterThan(0);
+    // One table, with the counteractions heading as a row inside it.
+    expect(dialog.querySelectorAll(".grid-table")).toHaveLength(1);
+    const table = dialog.querySelector(".grid-table") as HTMLElement;
+    expect(within(table).getByText("Counteractions")).toBeTruthy();
+    expect(within(table).getByText(/Blocks Foreign Aid/)).toBeTruthy();
+    expect(within(table).getByText(/Blocks Assassinate/)).toBeTruthy();
+    expect(within(table).getAllByText(/Blocks Steal/)).toHaveLength(2);
+  });
+
+  test("every value carries a label, so the table stays readable stacked on a phone", async () => {
+    const { host } = await startedGame();
+
+    await host.user.click(host.ui.getByRole("button", { name: "Actions" }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
+
+    // A narrow screen hides the column headings and stacks the columns, so each
+    // value must name itself — otherwise "3 coins" and "Take 3 coins" sit next to
+    // each other with nothing saying which is the cost.
+    for (const label of ["Effect", "Cost", "Blocked by"]) {
+      expect(dialog.querySelectorAll(`.grid-cell[data-label="${label}"]`)).toHaveLength(7);
     }
   });
 

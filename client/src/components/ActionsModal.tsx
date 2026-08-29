@@ -55,7 +55,7 @@ export function ActionsModal({ onClose }: { onClose: () => void }) {
 
           {CARDS.filter((card) => characterAbilities(card).blocks.length > 0).map((card) => (
             <div key={card} className={`grid-row-group card-${CARD_CLASS[card]}`}>
-              <div className="grid-cell">
+              <div className="grid-cell grid-cell-title">
                 <span className="chip-claim">{card}</span>
               </div>
               <div className="grid-cell grid-cell-wide">
@@ -91,13 +91,18 @@ function Row({
 }) {
   return (
     <div className={`grid-row-group${claim ? ` card-${CARD_CLASS[claim as never]}` : ""}`}>
-      <div className="grid-cell">
+      <div className="grid-cell grid-cell-title">
         <span className="grid-action">{label(action)}</span>
         {claim && <span className="chip-claim">{claim}</span>}
       </div>
-      <div className="grid-cell">{effect}</div>
-      <div className="grid-cell">{cost > 0 ? `${cost} coins` : "—"}</div>
-      <div className="grid-cell">
+      {/* Labels are shown only once the columns stack and the headings go away. */}
+      <div className="grid-cell" data-label="Effect">
+        {effect}
+      </div>
+      <div className="grid-cell" data-label="Cost">
+        {cost > 0 ? `${cost} coins` : "—"}
+      </div>
+      <div className="grid-cell" data-label="Blocked by">
         {blockedBy.length === 0 ? "—" : blockedBy.join(", ")}
       </div>
     </div>
