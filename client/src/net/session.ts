@@ -1,17 +1,13 @@
 import { Client, type Room } from "@colyseus/sdk";
-import {
-  ROOM_NAME,
-  type Card,
-  type ClientMessages,
-  type PublicView,
-} from "@coup/shared";
+import { ROOM_NAME, type Card, type ClientMessages } from "@coup/shared";
+import { toSnapshot, type Snapshot } from "./snapshot.js";
 
 const RECONNECT_KEY = "coup.reconnection";
 
 /** How long to wait for a clean disconnect before abandoning it. */
 const LEAVE_TIMEOUT_MS = 1000;
 
-export type Snapshot = PublicView & { playerId: string; code: string };
+export type { Snapshot };
 
 export interface SessionHandlers {
   onState: (snapshot: Snapshot) => void;
@@ -83,12 +79,7 @@ export class Session {
     writeToken(room.reconnectionToken);
 
     room.onStateChange((state) => {
-      this.handlers.onState({
-        ...(state.toJSON() as unknown as PublicView),
-        log: [...(state.log as unknown as string[])].map((e) => JSON.parse(e)),
-        playerId: room.sessionId,
-        code: room.roomId,
-      });
+      this.handlers.onState(toSnapshot(state.toJSON(), room.sessionId, room.roomId));
     });
 
     room.onMessage("hand", (m: { cards: Card[] }) => this.handlers.onHand(m.cards));

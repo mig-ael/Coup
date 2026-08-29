@@ -255,6 +255,35 @@ describe("whose turn it is", () => {
   });
 });
 
+describe("the lobby timer setting", () => {
+  test("None is shown as selected by default", async () => {
+    const { app } = await hostGame("Alice");
+
+    const none = app.ui.getByRole("button", { name: "None" });
+
+    expect(none.className).toContain("primary");
+  });
+
+  test("choosing a length moves the highlight, and back again", async () => {
+    const { app } = await hostGame("Alice");
+
+    await app.user.click(app.ui.getByRole("button", { name: "30s" }));
+    await waitFor(
+      () => expect(app.ui.getByRole("button", { name: "30s" }).className).toContain("primary"),
+      { timeout: 3000 },
+    );
+    expect(app.ui.getByRole("button", { name: "None" }).className).not.toContain("primary");
+
+    await app.user.click(app.ui.getByRole("button", { name: "None" }));
+
+    await waitFor(
+      () => expect(app.ui.getByRole("button", { name: "None" }).className).toContain("primary"),
+      { timeout: 3000 },
+    );
+    expect(app.ui.getByRole("button", { name: "30s" }).className).not.toContain("primary");
+  });
+});
+
 describe("navigation buttons", () => {
   test("Back is styled apart from the player names beside it", async () => {
     const { app: host, code } = await hostGame("Alice");

@@ -49,22 +49,20 @@ export function ActionsModal({ onClose }: { onClose: () => void }) {
               <Row key={action} action={action} claim={rule.claim} effect={EFFECT[action]} cost={rule.cost} blockedBy={rule.blockedBy} />
             );
           })}
-        </div>
 
-        <p className="section-label" style={{ marginTop: 20 }}>Counteractions</p>
-        <div className="grid-table grid-table-blocks">
-          <div className="grid-head">Character</div>
-          <div className="grid-head">Blocks</div>
+          {/* Counteractions continue the same table rather than starting a new one. */}
+          <div className="grid-section">Counteractions</div>
 
           {CARDS.filter((card) => characterAbilities(card).blocks.length > 0).map((card) => (
-            <div key={card} className="grid-row-group">
-              <div className={`grid-cell card-${CARD_CLASS[card]}`}>
+            <div key={card} className={`grid-row-group card-${CARD_CLASS[card]}`}>
+              <div className="grid-cell">
                 <span className="chip-claim">{card}</span>
               </div>
-              <div className="grid-cell">
+              <div className="grid-cell grid-cell-wide">
+                Blocks{" "}
                 {characterAbilities(card)
                   .blocks.map((a) => label(a))
-                  .join(", ")}
+                  .join(" and ")}
               </div>
             </div>
           ))}

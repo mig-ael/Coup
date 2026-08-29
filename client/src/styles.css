@@ -637,8 +637,20 @@ input:focus {
   overflow: hidden;
 }
 
-.grid-table-blocks {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+/* A heading row inside the table, separating actions from counteractions. */
+.grid-section {
+  grid-column: 1 / -1;
+  background: var(--surface-raised);
+  padding: 9px 12px;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* Cost and "blocked by" mean nothing for a counteraction, so its text runs on. */
+.grid-cell-wide {
+  grid-column: 2 / -1;
 }
 
 .grid-head {
@@ -688,8 +700,7 @@ input:focus {
 }
 
 @media (max-width: 560px) {
-  .grid-table,
-  .grid-table-blocks {
+  .grid-table {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
