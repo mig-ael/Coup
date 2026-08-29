@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import appServer from "@coup/server/src/index.js";
+import { resetAbuseLimits } from "@coup/server/src/rooms/GameRoom.js";
 import { App } from "../src/App.js";
 
 // Must match VITE_SERVER_URL in vitest.config.ts, which is what the app reads.
@@ -11,6 +12,9 @@ const PORT = 2596;
 beforeAll(async () => await appServer.listen(PORT));
 afterAll(async () => await appServer.gracefullyShutdown(false));
 afterEach(() => cleanup());
+// This suite creates rooms far faster than any real client, so clear the abuse
+// counters between cases rather than loosening the limits themselves.
+beforeEach(() => resetAbuseLimits());
 
 /** Renders the whole app as a player would see it, in its own DOM container. */
 function open() {

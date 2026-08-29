@@ -1,8 +1,17 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import { boot, type ColyseusTestServer } from "@colyseus/testing";
 import { CARDS, ROOM_NAME, type Card } from "@coup/shared";
 import appServer from "../../src/index.js";
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from "../../src/rooms/roomCodes.js";
+import { resetAbuseLimits } from "../../src/rooms/GameRoom.js";
+import {
+  CONNECTIONS_PER_IP,
+  MAX_CONCURRENT_ROOMS,
+  ROOM_CREATES_PER_IP,
+  openRoomCount,
+  resetRoomCount,
+  roomOpened,
+} from "../../src/rooms/limits.js";
 
 let colyseus: ColyseusTestServer;
 
@@ -11,6 +20,8 @@ beforeAll(async () => {
 });
 afterAll(async () => await colyseus.shutdown());
 afterEach(async () => await colyseus.cleanup());
+// Real clients never create rooms this fast; the limits stay production-realistic.
+beforeEach(() => resetAbuseLimits());
 
 /** Polls until `predicate` holds, so tests do not race the state sync. */
 async function until(predicate: () => boolean, label: string, timeoutMs = 2000): Promise<void> {
@@ -356,5 +367,72 @@ describe("the block timer", () => {
     await until(() => alice.state.phase === "awaiting_action_challenge", "window open");
 
     expect(alice.state.deadline).toBe(0);
+  });
+});
+
+describe("abuse limits", () => {
+  test("a normal group is nowhere near the connection limit", async () => {
+    const alice = await host("Alice");
+    for (const name of ["P2", "P3", "P4", "P5", "P6"]) await join(alice.roomId, name);
+
+    await until(() => alice.state.players.length === 6, "six seated");
+    expect(alice.state.players).toHaveLength(6);
+  });
+
+  test("rooms are counted while open and released when they close", async () => {
+    resetRoomCount();
+    const before = openRoomCount();
+
+    const alice = await host("Alice");
+    await until(() => alice.state.players.length === 1, "seated");
+    expect(openRoomCount()).toBe(before + 1);
+
+    await alice.leave(true);
+    await until(() => openRoomCount() === before, "room released");
+
+    expect(openRoomCount()).toBe(before);
+  });
+
+  test("creation is refused once the server is holding too many rooms", async () => {
+    resetRoomCount();
+    // Stand the counter at the cap without actually allocating that many rooms.
+    for (let i = 0; i < MAX_CONCURRENT_ROOMS; i++) roomOpened();
+
+    await expect(colyseus.sdk.create(ROOM_NAME, { name: "Alice" })).rejects.toThrow();
+
+    resetRoomCount();
+  });
+
+  test("one address cannot create rooms without limit", async () => {
+    resetAbuseLimits();
+    resetRoomCount();
+
+    // Everything here comes from one address, so the per-IP window applies.
+    const made = [];
+    for (let i = 0; i < ROOM_CREATES_PER_IP.max; i++) {
+      made.push(await colyseus.sdk.create(ROOM_NAME, { name: `P${i}` }));
+    }
+    expect(made).toHaveLength(ROOM_CREATES_PER_IP.max);
+
+    await expect(colyseus.sdk.create(ROOM_NAME, { name: "One too many" })).rejects.toThrow();
+
+    resetAbuseLimits();
+  });
+
+  test("the limit is well clear of what a real group does", async () => {
+    // Six players joining and a few rematches must never trip it.
+    expect(ROOM_CREATES_PER_IP.max).toBeGreaterThanOrEqual(10);
+    expect(CONNECTIONS_PER_IP.max).toBeGreaterThanOrEqual(6 * 5);
+  });
+
+  test("the cap lifts as soon as rooms are released", async () => {
+    resetRoomCount();
+    for (let i = 0; i < MAX_CONCURRENT_ROOMS; i++) roomOpened();
+    await expect(colyseus.sdk.create(ROOM_NAME, { name: "Alice" })).rejects.toThrow();
+
+    resetRoomCount();
+
+    const alice = await host("Alice");
+    expect(alice.roomId).toHaveLength(ROOM_CODE_LENGTH);
   });
 });

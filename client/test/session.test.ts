@@ -1,6 +1,7 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import type { Card } from "@coup/shared";
 import appServer from "@coup/server/src/index.js";
+import { resetAbuseLimits } from "@coup/server/src/rooms/GameRoom.js";
 import { Session, type Snapshot } from "../src/net/session.js";
 
 const PORT = 2591;
@@ -8,6 +9,9 @@ const ENDPOINT = `ws://localhost:${PORT}`;
 
 beforeAll(async () => await appServer.listen(PORT));
 afterAll(async () => await appServer.gracefullyShutdown(false));
+
+// This suite creates rooms far faster than any real client would.
+beforeEach(() => resetAbuseLimits());
 
 const open: Session[] = [];
 afterEach(async () => {

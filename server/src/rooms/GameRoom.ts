@@ -1,4 +1,4 @@
-import { Room, ServerError, matchMaker, type Client } from "colyseus";
+import { Room, ServerError, matchMaker, type AuthContext, type Client } from "colyseus";
 import {
   MAX_NAME_LENGTH,
   MAX_PLAYERS,
@@ -11,6 +11,29 @@ import { openWindowKey, privateHand, toPublicView } from "../game/project.js";
 import type { Command, GameState } from "../game/types.js";
 import { CoupState, syncState } from "../state/schema.js";
 import { generateRoomCode } from "./roomCodes.js";
+import {
+  CONNECTIONS_PER_IP,
+  MAX_CONCURRENT_ROOMS,
+  ROOM_CREATES_PER_IP,
+  SlidingWindow,
+  openRoomCount,
+  roomClosed,
+  roomOpened,
+} from "./limits.js";
+
+/** Shared across every room: the limits are per server, not per game. */
+const connectionLimit = new SlidingWindow(CONNECTIONS_PER_IP);
+const createLimit = new SlidingWindow(ROOM_CREATES_PER_IP);
+
+/**
+ * Test seam. The suite opens far more rooms per minute from one address than any
+ * real client would, so it clears the counters between cases rather than running
+ * against limits loosened to accommodate it.
+ */
+export function resetAbuseLimits(): void {
+  connectionLimit.clear();
+  createLimit.clear();
+}
 
 /** How many times to redraw a room code before giving up on a collision. */
 const CODE_ATTEMPTS = 10;
@@ -27,12 +50,22 @@ export class GameRoom extends Room {
   /** What each client was last told its own hand is, so we only resend on change. */
   private handsSent = new Map<string, string>();
 
+  /** Whether this room is included in the open-room count, so disposal decrements once. */
+  private counted = false;
+  /** The first client through onAuth is the one that created the room. */
+  private creatorSeen = false;
+
   private windowDeadline: number | null = null;
   private windowTimer: ReturnType<typeof setTimeout> | null = null;
   /** Which response window the running countdown belongs to. */
   private windowKey: string | null = null;
 
   override async onCreate(): Promise<void> {
+    // Refuse before doing any work, so a flood cannot force allocation.
+    if (openRoomCount() >= MAX_CONCURRENT_ROOMS) throw new ServerError(503, "server_busy");
+    roomOpened();
+    this.counted = true;
+
     this.roomId = await this.reserveRoomCode();
     this.maxClients = MAX_PLAYERS;
 
@@ -78,6 +111,23 @@ export class GameRoom extends Room {
     this.sync();
   }
 
+  /**
+   * Runs before onJoin, with the caller's address resolved from proxy headers. This
+   * is the only point where a connection can be turned away before it costs anything.
+   */
+  override onAuth(_client: Client, _options: JoinOptions, context: AuthContext): boolean {
+    const ip = context.ip;
+
+    if (!this.creatorSeen) {
+      this.creatorSeen = true;
+      if (!createLimit.tryConsume(ip)) throw new ServerError(429, "too_many_rooms");
+    }
+
+    if (!connectionLimit.tryConsume(ip)) throw new ServerError(429, "too_many_requests");
+
+    return true;
+  }
+
   override onJoin(client: Client, options: JoinOptions): void {
     // Late joins are rejected rather than seated as spectators.
     if (this.game.phase !== "lobby") throw new ServerError(409, "game_already_started");
@@ -119,6 +169,10 @@ export class GameRoom extends Room {
 
   override onDispose(): void {
     this.clearWindowTimer();
+    if (this.counted) {
+      roomClosed();
+      this.counted = false;
+    }
   }
 
   // ---------------------------------------------------------------- plumbing

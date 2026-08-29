@@ -54,6 +54,20 @@ choices were made deliberately:
 - A game needs two connected players. Once only one is left, it ends and is awarded to them — so in a two-player game, one person dropping ends it.
 - The host can still forfeit a disconnected player (surrendering both influence) to remove them from a larger game.
 
+## Abuse limits
+
+The server is open to the internet with no accounts, so a few caps stop one client
+exhausting the host. None of them protect hidden information — that is enforced by
+the rules engine and the state projection, not by these.
+
+- **10 room creations per address per minute.**
+- **60 connections per address per minute** — a household shares one address and
+  reconnects on every refresh, so this sits well above real play.
+- **100 open rooms** across the server at once.
+
+Addresses come from `AuthContext.ip`, which resolves proxy headers, so these work
+behind Render's load balancer rather than seeing a single upstream address.
+
 ## Deploying
 
 Two separate deployments.

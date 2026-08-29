@@ -22,6 +22,9 @@ const ERRORS: Record<string, string> = {
   player_connected: "That player is still connected.",
   already_eliminated: "That player is already out.",
   could_not_connect: "Could not reach the server.",
+  server_busy: "The server is at capacity right now. Try again in a moment.",
+  too_many_rooms: "You have created a lot of games just now. Wait a minute and try again.",
+  too_many_requests: "Too many connections from your network. Wait a minute and try again.",
   server_unreachable:
     "Could not reach the game server. It may be asleep — wait a minute and try again.",
 };
